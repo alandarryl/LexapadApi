@@ -1,0 +1,6 @@
+@LexapadAPI_HostAddress = http://localhost:5278
+
+GET {{LexapadAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
