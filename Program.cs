@@ -59,5 +59,17 @@ app.MapPost("/api/notes", async (LexapadAPI.Models.Note newNote, LexapadAPI.Data
 })
 .WithName("CreateNote");
 
+//Route GET : Récupérer toutes les notes
+app.MapGet("/api/notes", async (LexapadAPI.Data.LexapadDbContext db) =>
+{
+    // On demande à Entity Framework d'aller chercher toutes les notes
+    // et de les transformer en une liste asynchrone
+    var notes = await db.Notes.ToListAsync();
+
+    //On renvoie un statut 200 ok avec la liste des notes en JSON
+    return Results.Ok(notes);
+})
+.WithName("GetAllNotes");
+
 // Le serveur démarre ici
 app.Run();
