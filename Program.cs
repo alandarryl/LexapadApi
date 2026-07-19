@@ -38,5 +38,26 @@ app.MapGet("/world", () =>
 })
 .WithName("GetWorld");
 
+// --- NOS ROUTES CRUD ---
+
+// Route POST : Créer une nouvelle note
+app.MapPost("/api/notes", async (LexapadAPI.Models.Note newNote, LexapadAPI.Data.LexapadDbContext db) =>
+{
+    // 1. On s'assure que la note a bien un ID unique et des dates fraîches
+    newNote.Id = Guid.NewGuid();
+    newNote.CreateAt = DateTime.UtcNow;
+    newNote.UpdateAt = DateTime.UtcNow;
+
+    // 2. On demande à Entity Framework de préparer l'ajout de la note
+    db.Notes.Add(newNote);
+
+    // 3. On pousse le changement physiquement dans la base Supabase
+    await db.SaveChangesAsync();
+
+    // 4. On renvoie un statut "201 Created" avec la note qu'on vient de stocker
+    return Results.Created($"/api/notes/{newNote.Id}", newNote);
+})
+.WithName("CreateNote");
+
 // Le serveur démarre ici
 app.Run();
