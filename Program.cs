@@ -71,5 +71,22 @@ app.MapGet("/api/notes", async (LexapadAPI.Data.LexapadDbContext db) =>
 })
 .WithName("GetAllNotes");
 
+//Route GET : Récupérer une note spécifique par son ID
+app.MapGet("/api/notes/{id:guid}", async (Guid id, LexapadAPI.Data.LexapadDbContext db) =>
+{
+    //On cherche la note dans la table par sa clé primaire (Id)
+    var note = await db.Notes.FindAsync(id);
+
+    //Si la note n'existe pas, on renvoie un statut 404 Not Found
+    if(note is null)
+    {
+        return Results.NotFound(new { message = "Désolé, cette note est introuvable."});
+
+    }
+        //Si on la trouve, on renvoie un statut 200 OK avec la note
+        return Results.Ok(note); 
+})
+.WithName("GetNoteById");
+
 // Le serveur démarre ici
 app.Run();
