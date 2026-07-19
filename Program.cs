@@ -1,4 +1,15 @@
+using LexapadAPI.Data;
+using Microsoft.EntityFrameworkCore;
+
+
 var builder = WebApplication.CreateBuilder(args);
+
+//1. On récupère l'url de connexion cachée dans appsettings.json
+var connectionString = builder.Configuration.GetConnectionString("SupabaseConnection");
+
+//2. On branche notre lexapaddBbContext à PostgreSQL (Supabase)
+builder.Services.AddDbContext<LexapadDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
 // Enregistrement des services
 builder.Services.AddOpenApi();
