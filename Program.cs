@@ -1,5 +1,6 @@
 using LexapadAPI.Data;
 using LexapadAPI.Endpoints; // <--- Import nécessaire
+using LexapadAPI.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Configuration de la DB (Supabase/Postgres)
 builder.Services.AddDbContext<LexapadDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("SupabaseConnection")));
+
+// Enregistrement de HttpClient et de notre AnalysisService
+builder.Services.AddHttpClient<AnalysisService>();
 
 builder.Services.AddCors(options =>
 {
@@ -25,5 +29,6 @@ app.UseCors("AllowAll");
 // Tes routes sont maintenant appelées ici
 app.MapNoteEndpoints(); 
 app.MapAnalysisEndpoints();
+
 
 app.Run();
