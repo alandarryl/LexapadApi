@@ -88,5 +88,37 @@ app.MapGet("/api/notes/{id:guid}", async (Guid id, LexapadAPI.Data.LexapadDbCont
 })
 .WithName("GetNoteById");
 
+// Route PUT : Modifier une note existante
+app.MapPut("/api/notes/{id:guid}", async (Guid id, LexapadAPI.Models.Note updatedNote, LexapadAPI.Data.LexapadDbContext db) =>
+{
+    // 1. On cherche la note existante en base
+    var existingNote = await db.Notes.FindAsync(id);
+
+    // 2. Si elle n'existe pas, on renvoie une erreur 404
+    if (existingNote is null)
+    {
+        return Results.NotFound(new { message = "Impossible de modifier : cette note n'existe pas." });
+    }
+
+    // 3. On met à jour uniquement les champs modifiables
+    existingNote.Title = updatedNote.Title;
+    existingNote.Content = updatedNote.Content;
+    existingNote.FontName = updatedNote.FontName;
+    existingNote.FontSize = updatedNote.FontSize;
+    existingNote.LetterSpacing = updatedNote.LetterSpacing;
+    existingNote.LineHeight = updatedNote.LineHeight;
+    
+    // On met à jour la date de modification avec l'heure actuelle
+    existingNote.UpdateAt = DateTime.UtcNow;
+
+    // 4. On sauvegarde les changements sur Supabase
+    await db.SaveChangesAsync();
+
+    // 5. On renvoie un statut 204 No Content (bonne pratique pour un PUT réussi sans retour de données)
+    // ou un 200 OK avec la note. Choisissons 200 OK pour voir le résultat direct !
+    return Results.Ok(existingNote);
+})
+.WithName("UpdateNote");
+
 // Le serveur démarre ici
 app.Run();
