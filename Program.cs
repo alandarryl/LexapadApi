@@ -11,6 +11,7 @@ builder.Services.AddDbContext<LexapadDbContext>(options =>
 
 // Enregistrement de HttpClient et de notre AnalysisService
 builder.Services.AddHttpClient<AnalysisService>();
+builder.Services.AddHttpClient<EssayService>();
 
 builder.Services.AddCors(options =>
 {
@@ -29,6 +30,7 @@ app.UseCors("AllowAll");
 // Tes routes sont maintenant appelées ici
 app.MapNoteEndpoints(); 
 app.MapAnalysisEndpoints();
+app.MapEssayEndpoints();
 
 
 app.Run();
