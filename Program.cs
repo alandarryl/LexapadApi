@@ -120,5 +120,28 @@ app.MapPut("/api/notes/{id:guid}", async (Guid id, LexapadAPI.Models.Note update
 })
 .WithName("UpdateNote");
 
+// Route DELETE : Supprimer une note par son ID
+app.MapDelete("/api/notes/{id:guid}", async (Guid id, LexapadAPI.Data.LexapadDbContext db) =>
+{
+    // 1. On cherche la note en base
+    var note = await db.Notes.FindAsync(id);
+
+    // 2. Si elle n'existe pas, on renvoie une 404
+    if (note is null)
+    {
+        return Results.NotFound(new { message = "Impossible de supprimer : cette note n'existe pas." });
+    }
+
+    // 3. On demande à Entity Framework de marquer la note comme supprimée
+    db.Notes.Remove(note);
+
+    // 4. On applique la suppression physique sur Supabase
+    await db.SaveChangesAsync();
+
+    // 5. On renvoie un statut 204 No Content (la norme HTTP pour dire 'supprimé avec succès, rien à renvoyer')
+    return Results.NoContent();
+})
+.WithName("DeleteNote");
+
 // Le serveur démarre ici
 app.Run();
