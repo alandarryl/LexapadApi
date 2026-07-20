@@ -9,9 +9,25 @@ namespace LexapadAPI.Data
         public LexapadDbContext(DbContextOptions<LexapadDbContext> options) : base(options)
         {
         }
-        //c'est cette propriété qui dit à .NET : "Crée une table 'Note' basée sur mon modèle 'Note'"
-        public DbSet<Note> Notes {get; set;}
+
+        // Table des notes textuelles classiques (inchangée)
+        public DbSet<Note> Notes { get; set; }
+
+        // Nouvelles tables dédiées à la fonctionnalité Canvas / Milanote (indépendantes des notes classiques)
+        public DbSet<CanvasBoard> CanvasBoards { get; set; }
+        public DbSet<CanvasItem> CanvasItems { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // Indique à EF Core qu'un tableau contient plusieurs éléments (post-its, cartes)
+            // et que si on supprime un tableau, ses éléments sont supprimés automatiquement.
+            modelBuilder.Entity<CanvasBoard>()
+                .HasMany(b => b.Items)
+                .WithOne(i => i.CanvasBoard)
+                .HasForeignKey(i => i.CanvasBoardId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
     }
 }
-
-
