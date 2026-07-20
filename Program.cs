@@ -24,5 +24,6 @@ app.UseCors("AllowAll");
 
 // Tes routes sont maintenant appelées ici
 app.MapNoteEndpoints(); 
+app.MapAnalysisEndpoints();
 
 app.Run();
