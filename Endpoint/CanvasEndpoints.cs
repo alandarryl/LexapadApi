@@ -56,55 +56,57 @@ public static class CanvasEndpoints
         });
 
         // POST /api/boards/{boardId}/items : Créer ou mettre à jour un post-it/carte
-            group.MapPost("/{boardId:guid}/items", async (Guid boardId, CanvasItem itemRequest, LexapadDbContext db) =>
+        group.MapPost("/{boardId:guid}/items", async (Guid boardId, CanvasItem itemRequest, LexapadDbContext db) =>
+        {
+            var board = await db.CanvasBoards.FindAsync(boardId);
+            if (board is null) return Results.NotFound("Tableau introuvable");
+
+            // 1. On cherche si la carte existe VRAIMENT dans la base de données
+            CanvasItem? existingItem = null;
+            if (itemRequest.Id != Guid.Empty)
             {
-                var board = await db.CanvasBoards.FindAsync(boardId);
-                if (board is null) return Results.NotFound("Tableau introuvable");
+                existingItem = await db.CanvasItems.FindAsync(itemRequest.Id);
+            }
 
-                // 1. On cherche si la carte existe VRAIMENT dans la base de données
-                CanvasItem? existingItem = null;
-                if (itemRequest.Id != Guid.Empty)
+            if (existingItem is null)
+            {
+                // 2. CRÉATION (La carte n'existe pas encore en BDD)
+                if (itemRequest.Id == Guid.Empty)
                 {
-                    existingItem = await db.CanvasItems.FindAsync(itemRequest.Id);
+                    itemRequest.Id = Guid.NewGuid();
                 }
 
-                if (existingItem is null)
-                {
-                    // 2. CRÉATION (La carte n'existe pas encore en BDD)
-                    if (itemRequest.Id == Guid.Empty)
-                    {
-                        itemRequest.Id = Guid.NewGuid();
-                    }
+                itemRequest.CanvasBoardId = boardId;
+                itemRequest.UpdatedAt = DateTime.UtcNow;
+                
+                // Force Entity Framework à comprendre que c'est un NOUVEL ajout (INSERT)
+                db.Entry(itemRequest).State = EntityState.Added;
+            }
+            else
+            {
+                // 3. MISE À JOUR (La carte existe déjà en BDD)
+                existingItem.Content = itemRequest.Content;
+                existingItem.PositionX = itemRequest.PositionX;
+                existingItem.PositionY = itemRequest.PositionY;
+                existingItem.Width = itemRequest.Width;
+                existingItem.Height = itemRequest.Height;
+                existingItem.Color = itemRequest.Color;
+                existingItem.Type = itemRequest.Type;
+                existingItem.ZIndex = itemRequest.ZIndex;
+                existingItem.UpdatedAt = DateTime.UtcNow;
+            }
 
-                    itemRequest.CanvasBoardId = boardId;
-                    itemRequest.UpdatedAt = DateTime.UtcNow;
-                    
-                    // Force Entity Framework à comprendre que c'est un NOUVEL ajout (INSERT)
-                    db.Entry(itemRequest).State = EntityState.Added;
-                }
-                else
-                {
-                    // 3. MISE À JOUR (La carte existe déjà en BDD)
-                    existingItem.Content = itemRequest.Content;
-                    existingItem.PositionX = itemRequest.PositionX;
-                    existingItem.PositionY = itemRequest.PositionY;
-                    existingItem.Width = itemRequest.Width;
-                    existingItem.Height = itemRequest.Height;
-                    existingItem.Color = itemRequest.Color;
-                    existingItem.Type = itemRequest.Type;
-                    existingItem.ZIndex = itemRequest.ZIndex;
-                    existingItem.UpdatedAt = DateTime.UtcNow;
-                }
+            await db.SaveChangesAsync();
 
-                await db.SaveChangesAsync();
-                return Results.Ok(itemRequest);
-            });
+            // On retourne l'élément mis à jour ou l'élément créé
+            return Results.Ok(existingItem ?? itemRequest);
+        });
 
         // DELETE /api/boards/items/{itemId} : Supprimer une carte
         group.MapDelete("/items/{itemId:guid}", async (Guid itemId, LexapadDbContext db) =>
         {
             var item = await db.CanvasItems.FindAsync(itemId);
-            if (item is null) return Results.NotFound();
+            if (item is null) return Results.NotFound("Carte introuvable");
 
             db.CanvasItems.Remove(item);
             await db.SaveChangesAsync();
