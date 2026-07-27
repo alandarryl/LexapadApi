@@ -61,7 +61,7 @@ public static class CanvasEndpoints
                 var board = await db.CanvasBoards.FindAsync(boardId);
                 if (board is null) return Results.NotFound("Tableau introuvable");
 
-                // 1. On cherche d'abord si la carte existe en base de données
+                // 1. On cherche si la carte existe VRAIMENT dans la base de données
                 CanvasItem? existingItem = null;
                 if (itemRequest.Id != Guid.Empty)
                 {
@@ -70,7 +70,7 @@ public static class CanvasEndpoints
 
                 if (existingItem is null)
                 {
-                    // 2. CRÉATION : Si elle n'existe pas en base, on la crée (qu'il y ait un ID ou non)
+                    // 2. CRÉATION (La carte n'existe pas encore en BDD)
                     if (itemRequest.Id == Guid.Empty)
                     {
                         itemRequest.Id = Guid.NewGuid();
@@ -79,11 +79,12 @@ public static class CanvasEndpoints
                     itemRequest.CanvasBoardId = boardId;
                     itemRequest.UpdatedAt = DateTime.UtcNow;
                     
-                    db.CanvasItems.Add(itemRequest);
+                    // Force Entity Framework à comprendre que c'est un NOUVEL ajout (INSERT)
+                    db.Entry(itemRequest).State = EntityState.Added;
                 }
                 else
                 {
-                    // 3. MISE À JOUR : Si la carte existe déjà en BDD
+                    // 3. MISE À JOUR (La carte existe déjà en BDD)
                     existingItem.Content = itemRequest.Content;
                     existingItem.PositionX = itemRequest.PositionX;
                     existingItem.PositionY = itemRequest.PositionY;
