@@ -31,6 +31,7 @@ app.UseCors("AllowAll");
 app.MapNoteEndpoints(); 
 app.MapAnalysisEndpoints();
 app.MapEssayEndpoints();
+app.MapCanvasEndpoints();
 
 
 app.Run();
