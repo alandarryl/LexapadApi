@@ -29,17 +29,24 @@ public static class NoteEndpoints
         });
 
         group.MapPut("/{id:guid}", async (Guid id, Note updatedNote, LexapadDbContext db) =>
-        {
-            var existingNote = await db.Notes.FindAsync(id);
-            if (existingNote is null) return Results.NotFound();
-            
-            existingNote.Title = updatedNote.Title;
-            existingNote.Content = updatedNote.Content;
-            existingNote.UpdateAt = DateTime.UtcNow;
-            
-            await db.SaveChangesAsync();
-            return Results.Ok(existingNote);
-        });
+            {
+                var existingNote = await db.Notes.FindAsync(id);
+                if (existingNote is null) return Results.NotFound();
+                
+                existingNote.Title = updatedNote.Title;
+                existingNote.Content = updatedNote.Content;
+                
+                // Ajoute ces lignes pour sauvegarder aussi les préférences d'affichage :
+                existingNote.FontName = updatedNote.FontName;
+                existingNote.FontSize = updatedNote.FontSize;
+                existingNote.LetterSpacing = updatedNote.LetterSpacing;
+                existingNote.LineHeight = updatedNote.LineHeight;
+                
+                existingNote.UpdateAt = DateTime.UtcNow;
+                
+                await db.SaveChangesAsync();
+                return Results.Ok(existingNote);
+            });
 
         group.MapDelete("/{id:guid}", async (Guid id, LexapadDbContext db) =>
         {
