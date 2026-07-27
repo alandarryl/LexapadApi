@@ -56,40 +56,48 @@ public static class CanvasEndpoints
         });
 
         // POST /api/boards/{boardId}/items : Créer ou mettre à jour un post-it/carte
-        group.MapPost("/{boardId:guid}/items", async (Guid boardId, CanvasItem itemRequest, LexapadDbContext db) =>
-        {
-            var board = await db.CanvasBoards.FindAsync(boardId);
-            if (board is null) return Results.NotFound("Tableau introuvable");
-
-            if (itemRequest.Id == Guid.Empty)
+            group.MapPost("/{boardId:guid}/items", async (Guid boardId, CanvasItem itemRequest, LexapadDbContext db) =>
             {
-                // CRÉATION : On utilise CanvasBoardId
-                itemRequest.Id = Guid.NewGuid();
-                itemRequest.CanvasBoardId = boardId;
-                itemRequest.UpdatedAt = DateTime.UtcNow;
-                
-                db.CanvasItems.Add(itemRequest);
-            }
-            else
-            {
-                // MISE À JOUR d'une carte existante
-                var existingItem = await db.CanvasItems.FindAsync(itemRequest.Id);
-                if (existingItem is null) return Results.NotFound("Carte introuvable");
+                var board = await db.CanvasBoards.FindAsync(boardId);
+                if (board is null) return Results.NotFound("Tableau introuvable");
 
-                existingItem.Content = itemRequest.Content;
-                existingItem.PositionX = itemRequest.PositionX;
-                existingItem.PositionY = itemRequest.PositionY;
-                existingItem.Width = itemRequest.Width;
-                existingItem.Height = itemRequest.Height;
-                existingItem.Color = itemRequest.Color;
-                existingItem.Type = itemRequest.Type;
-                existingItem.ZIndex = itemRequest.ZIndex;
-                existingItem.UpdatedAt = DateTime.UtcNow;
-            }
+                // 1. On cherche d'abord si la carte existe en base de données
+                CanvasItem? existingItem = null;
+                if (itemRequest.Id != Guid.Empty)
+                {
+                    existingItem = await db.CanvasItems.FindAsync(itemRequest.Id);
+                }
 
-            await db.SaveChangesAsync();
-            return Results.Ok(itemRequest);
-        });
+                if (existingItem is null)
+                {
+                    // 2. CRÉATION : Si elle n'existe pas en base, on la crée (qu'il y ait un ID ou non)
+                    if (itemRequest.Id == Guid.Empty)
+                    {
+                        itemRequest.Id = Guid.NewGuid();
+                    }
+
+                    itemRequest.CanvasBoardId = boardId;
+                    itemRequest.UpdatedAt = DateTime.UtcNow;
+                    
+                    db.CanvasItems.Add(itemRequest);
+                }
+                else
+                {
+                    // 3. MISE À JOUR : Si la carte existe déjà en BDD
+                    existingItem.Content = itemRequest.Content;
+                    existingItem.PositionX = itemRequest.PositionX;
+                    existingItem.PositionY = itemRequest.PositionY;
+                    existingItem.Width = itemRequest.Width;
+                    existingItem.Height = itemRequest.Height;
+                    existingItem.Color = itemRequest.Color;
+                    existingItem.Type = itemRequest.Type;
+                    existingItem.ZIndex = itemRequest.ZIndex;
+                    existingItem.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await db.SaveChangesAsync();
+                return Results.Ok(itemRequest);
+            });
 
         // DELETE /api/boards/items/{itemId} : Supprimer une carte
         group.MapDelete("/items/{itemId:guid}", async (Guid itemId, LexapadDbContext db) =>
