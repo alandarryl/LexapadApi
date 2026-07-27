@@ -4,6 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LexapadAPI.Endpoints;
 
+// DTO pour la création d'un tableau (évite les erreurs de désérialisation JSON)
+public record CreateBoardDto(string Title, string? BackgroundColor);
+
 public static class CanvasEndpoints
 {
     public static void MapCanvasEndpoints(this IEndpointRouteBuilder app)
@@ -28,15 +31,27 @@ public static class CanvasEndpoints
             return board is not null ? Results.Ok(board) : Results.NotFound();
         });
 
-        // POST /api/boards : Créer un nouveau tableau
-        group.MapPost("/", async (CanvasBoard newBoard, LexapadDbContext db) =>
+        // POST /api/boards : Créer un nouveau tableau via CreateBoardDto
+        group.MapPost("/", async (CreateBoardDto request, LexapadDbContext db) =>
         {
-            newBoard.Id = Guid.NewGuid();
-            newBoard.CreatedAt = DateTime.UtcNow;
-            newBoard.UpdatedAt = DateTime.UtcNow;
-            
+            if (string.IsNullOrWhiteSpace(request.Title))
+            {
+                return Results.BadRequest("Le titre est obligatoire.");
+            }
+
+            var newBoard = new CanvasBoard
+            {
+                Id = Guid.NewGuid(),
+                Title = request.Title,
+                BackgroundColor = request.BackgroundColor ?? "#F9FAFB",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                Items = new List<CanvasItem>()
+            };
+
             db.CanvasBoards.Add(newBoard);
             await db.SaveChangesAsync();
+
             return Results.Created($"/api/boards/{newBoard.Id}", newBoard);
         });
 
@@ -48,7 +63,7 @@ public static class CanvasEndpoints
 
             if (itemRequest.Id == Guid.Empty)
             {
-                // CRÉATION : On utilise CanvasBoardId (nom exact dans ton modèle !)
+                // CRÉATION : On utilise CanvasBoardId
                 itemRequest.Id = Guid.NewGuid();
                 itemRequest.CanvasBoardId = boardId;
                 itemRequest.UpdatedAt = DateTime.UtcNow;
