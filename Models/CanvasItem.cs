@@ -15,6 +15,13 @@ public class CanvasItem
     [JsonIgnore]
     public CanvasBoard? CanvasBoard { get; set; }
 
+    // 🔑 1. Clé étrangère vers l'utilisateur
+    public Guid UserId { get; set; }
+
+    // 🔑 2. Relation vers le modèle User (ignorée en JSON pour éviter les boucles circulaires)
+    [JsonIgnore]
+    public User? User { get; set; }
+
     // Type d'élément : "postit", "card", "text"
     public string Type { get; set; } = "postit";
 

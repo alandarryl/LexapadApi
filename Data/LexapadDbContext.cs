@@ -10,10 +10,13 @@ namespace LexapadAPI.Data
         {
         }
 
-        // Table des notes textuelles classiques (inchangée)
+        // 🔑 Table des utilisateurs (c'est cette ligne qui manquait pour enlever les lignes rouges !)
+        public DbSet<User> Users { get; set; }
+
+        // Table des notes textuelles classiques
         public DbSet<Note> Notes { get; set; }
 
-        // Nouvelles tables dédiées à la fonctionnalité Canvas / Milanote (indépendantes des notes classiques)
+        // Nouvelles tables dédiées à la fonctionnalité Canvas / Milanote
         public DbSet<CanvasBoard> CanvasBoards { get; set; }
         public DbSet<CanvasItem> CanvasItems { get; set; }
 

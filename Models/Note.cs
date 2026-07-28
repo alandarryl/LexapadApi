@@ -1,27 +1,24 @@
-using System;
+namespace LexapadAPI.Models;
 
-namespace LexapadAPI.Models
+public class Note
 {
-    public class Note
-    {
-        //1. L'identifiant unique de la note
-        public Guid Id {get; set;} = Guid.NewGuid();
+    public string Id { get; set; } = Guid.NewGuid().ToString(); // Ou Guid si tu préfères
+    public string Title { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    
+    // Propriétés de style existantes
+    public string FontName { get; set; } = "Inter";
+    public int FontSize { get; set; } = 16;
+    public double LetterSpacing { get; set; } = 0;
+    public double LineHeight { get; set; } = 1.5;
 
-        //2. Le titre et le contenu textuel
-        public string Title { get; set;} = string.Empty;
-        public string Content {get; set;} = string.Empty;
+    // Dates
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdateAt { get; set; } = DateTime.UtcNow;
 
-        //3. Préférence d'affichage
-        public string FontName {get; set;} = "OpenDyslexic";
-        public double FontSize { get; set;} = 16.0;
-        public double LetterSpacing { get; set;} = 0.15;
-        public double LineHeight {get; set;} = 1.8;
+    // 🔑 1. Clé étrangère vers l'utilisateur (changée en Guid)
+    public Guid UserId { get; set; }
 
-        //4. Métadonnées temporelles
-        public DateTime CreateAt {get; set;} = DateTime.UtcNow;
-        public DateTime UpdateAt {get; set;} = DateTime.UtcNow;
-
-        //5. Identification de l'utilisateur
-        public string UserId { get; set;} =string.Empty;
-    }
+    // 🔑 2. Relation avec la table User
+    public User? User { get; set; }
 }

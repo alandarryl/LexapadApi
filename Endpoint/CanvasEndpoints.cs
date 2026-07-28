@@ -1,115 +1,134 @@
+using System.Security.Claims;
 using LexapadAPI.Data;
 using LexapadAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace LexapadAPI.Endpoints;
 
-// DTO pour la création d'un tableau (évite les erreurs de désérialisation JSON)
-public record CreateBoardDto(string Title, string? BackgroundColor);
-
 public static class CanvasEndpoints
 {
     public static void MapCanvasEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/boards");
+        // 🔒 Exige un Token JWT valide pour toutes les routes du Canvas
+        var group = app.MapGroup("/api/canvas").RequireAuthorization();
 
-        // GET /api/boards : Récupérer tous les tableaux
-        group.MapGet("/", async (LexapadDbContext db) =>
+        // Helper pour extraire l'UserId du token
+        static Guid GetUserId(ClaimsPrincipal user)
         {
-            return await db.CanvasBoards
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(userIdClaim, out var id) ? id : Guid.Empty;
+        }
+
+        // 1. Récupérer tous les tableaux de l'utilisateur connecté
+        group.MapGet("/boards", async (ClaimsPrincipal user, LexapadDbContext db) =>
+        {
+            var userId = GetUserId(user);
+            var boards = await db.CanvasBoards
+                .Where(b => b.UserId == userId)
                 .Include(b => b.Items)
                 .ToListAsync();
+
+            return Results.Ok(boards);
         });
 
-        // GET /api/boards/{id} : Récupérer un tableau par ID avec ses cartes
-        group.MapGet("/{id:guid}", async (Guid id, LexapadDbContext db) =>
+        // 2. Créer un nouveau tableau
+        group.MapPost("/boards", async (CanvasBoard newBoard, ClaimsPrincipal user, LexapadDbContext db) =>
         {
-            var board = await db.CanvasBoards
-                .Include(b => b.Items)
-                .FirstOrDefaultAsync(b => b.Id == id);
+            var userId = GetUserId(user);
+            if (userId == Guid.Empty) return Results.Unauthorized();
 
-            return board is not null ? Results.Ok(board) : Results.NotFound();
-        });
-
-        // POST /api/boards : Créer un nouveau tableau via CreateBoardDto
-        group.MapPost("/", async (CreateBoardDto request, LexapadDbContext db) =>
-        {
-            if (string.IsNullOrWhiteSpace(request.Title))
-            {
-                return Results.BadRequest("Le titre est obligatoire.");
-            }
-
-            var newBoard = new CanvasBoard
-            {
-                Id = Guid.NewGuid(),
-                Title = request.Title,
-                BackgroundColor = request.BackgroundColor ?? "#F9FAFB",
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-                Items = new List<CanvasItem>()
-            };
+            newBoard.Id = Guid.NewGuid();
+            newBoard.UserId = userId; // 🔑 Assigne l'utilisateur connecté
+            newBoard.CreatedAt = DateTime.UtcNow;
+            newBoard.UpdatedAt = DateTime.UtcNow;
 
             db.CanvasBoards.Add(newBoard);
             await db.SaveChangesAsync();
 
-            return Results.Created($"/api/boards/{newBoard.Id}", newBoard);
+            return Results.Created($"/api/canvas/boards/{newBoard.Id}", newBoard);
         });
 
-        // POST /api/boards/{boardId}/items : Créer ou mettre à jour un post-it/carte
-        group.MapPost("/{boardId:guid}/items", async (Guid boardId, CanvasItem itemRequest, LexapadDbContext db) =>
+        // 3. Récupérer un tableau spécifique avec ses éléments (Post-its, cartes...)
+        group.MapGet("/boards/{id:guid}", async (Guid id, ClaimsPrincipal user, LexapadDbContext db) =>
         {
-            var board = await db.CanvasBoards.FindAsync(boardId);
-            if (board is null) return Results.NotFound("Tableau introuvable");
+            var userId = GetUserId(user);
+            var board = await db.CanvasBoards
+                .Include(b => b.Items)
+                .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
 
-            // 1. On cherche si la carte existe VRAIMENT dans la base de données
-            CanvasItem? existingItem = null;
-            if (itemRequest.Id != Guid.Empty)
-            {
-                existingItem = await db.CanvasItems.FindAsync(itemRequest.Id);
-            }
+            return board is not null ? Results.Ok(board) : Results.NotFound();
+        });
 
-            if (existingItem is null)
-            {
-                // 2. CRÉATION (La carte n'existe pas encore en BDD)
-                if (itemRequest.Id == Guid.Empty)
-                {
-                    itemRequest.Id = Guid.NewGuid();
-                }
+        // 4. Supprimer un tableau
+        group.MapDelete("/boards/{id:guid}", async (Guid id, ClaimsPrincipal user, LexapadDbContext db) =>
+        {
+            var userId = GetUserId(user);
+            var board = await db.CanvasBoards
+                .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
 
-                itemRequest.CanvasBoardId = boardId;
-                itemRequest.UpdatedAt = DateTime.UtcNow;
-                
-                // Force Entity Framework à comprendre que c'est un NOUVEL ajout (INSERT)
-                db.Entry(itemRequest).State = EntityState.Added;
-            }
-            else
-            {
-                // 3. MISE À JOUR (La carte existe déjà en BDD)
-                existingItem.Content = itemRequest.Content;
-                existingItem.PositionX = itemRequest.PositionX;
-                existingItem.PositionY = itemRequest.PositionY;
-                existingItem.Width = itemRequest.Width;
-                existingItem.Height = itemRequest.Height;
-                existingItem.Color = itemRequest.Color;
-                existingItem.Type = itemRequest.Type;
-                existingItem.ZIndex = itemRequest.ZIndex;
-                existingItem.UpdatedAt = DateTime.UtcNow;
-            }
+            if (board is null) return Results.NotFound();
 
+            db.CanvasBoards.Remove(board);
             await db.SaveChangesAsync();
 
-            // On retourne l'élément mis à jour ou l'élément créé
-            return Results.Ok(existingItem ?? itemRequest);
+            return Results.NoContent();
         });
 
-        // DELETE /api/boards/items/{itemId} : Supprimer une carte
-        group.MapDelete("/items/{itemId:guid}", async (Guid itemId, LexapadDbContext db) =>
+        // 5. Ajouter un élément (Post-it / Carte) sur un tableau
+        group.MapPost("/boards/{boardId:guid}/items", async (Guid boardId, CanvasItem item, ClaimsPrincipal user, LexapadDbContext db) =>
         {
-            var item = await db.CanvasItems.FindAsync(itemId);
-            if (item is null) return Results.NotFound("Carte introuvable");
+            var userId = GetUserId(user);
+            var board = await db.CanvasBoards
+                .FirstOrDefaultAsync(b => b.Id == boardId && b.UserId == userId);
+
+            if (board is null) return Results.NotFound("Tableau introuvable ou accès refusé.");
+
+            item.Id = Guid.NewGuid();
+            item.CanvasBoardId = boardId;
+            item.UserId = userId;
+            item.UpdatedAt = DateTime.UtcNow;
+
+            db.CanvasItems.Add(item);
+            await db.SaveChangesAsync();
+
+            return Results.Created($"/api/canvas/items/{item.Id}", item);
+        });
+
+        // 6. Mettre à jour la position ou le contenu d'un élément
+        group.MapPut("/items/{id:guid}", async (Guid id, CanvasItem updatedItem, ClaimsPrincipal user, LexapadDbContext db) =>
+        {
+            var userId = GetUserId(user);
+            var existingItem = await db.CanvasItems
+                .FirstOrDefaultAsync(i => i.Id == id && i.UserId == userId);
+
+            if (existingItem is null) return Results.NotFound();
+
+            existingItem.Type = updatedItem.Type;
+            existingItem.Content = updatedItem.Content;
+            existingItem.PositionX = updatedItem.PositionX;
+            existingItem.PositionY = updatedItem.PositionY;
+            existingItem.Width = updatedItem.Width;
+            existingItem.Height = updatedItem.Height;
+            existingItem.Color = updatedItem.Color;
+            existingItem.ZIndex = updatedItem.ZIndex;
+            existingItem.UpdatedAt = DateTime.UtcNow;
+
+            await db.SaveChangesAsync();
+            return Results.Ok(existingItem);
+        });
+
+        // 7. Supprimer un élément du tableau
+        group.MapDelete("/items/{id:guid}", async (Guid id, ClaimsPrincipal user, LexapadDbContext db) =>
+        {
+            var userId = GetUserId(user);
+            var item = await db.CanvasItems
+                .FirstOrDefaultAsync(i => i.Id == id && i.UserId == userId);
+
+            if (item is null) return Results.NotFound();
 
             db.CanvasItems.Remove(item);
             await db.SaveChangesAsync();
+
             return Results.NoContent();
         });
     }
