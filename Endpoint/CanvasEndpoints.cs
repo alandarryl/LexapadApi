@@ -76,23 +76,24 @@ public static class CanvasEndpoints
 
         // 5. Ajouter un élément (Post-it / Carte) sur un tableau
         group.MapPost("/boards/{boardId:guid}/items", async (Guid boardId, CanvasItem item, ClaimsPrincipal user, LexapadDbContext db) =>
-        {
-            var userId = GetUserId(user);
-            var board = await db.CanvasBoards
-                .FirstOrDefaultAsync(b => b.Id == boardId && b.UserId == userId);
+            {
+                var userId = GetUserId(user);
+                var board = await db.CanvasBoards
+                    .FirstOrDefaultAsync(b => b.Id == boardId && b.UserId == userId);
 
-            if (board is null) return Results.NotFound("Tableau introuvable ou accès refusé.");
+                if (board is null) return Results.NotFound("Tableau introuvable ou accès refusé.");
 
-            item.Id = Guid.NewGuid();
-            item.CanvasBoardId = boardId;
-            item.UserId = userId;
-            item.UpdatedAt = DateTime.UtcNow;
+                item.Id = Guid.NewGuid();
+                item.CanvasBoardId = boardId;
+                item.UserId = userId;
+                item.Type = string.IsNullOrEmpty(item.Type) ? "postit" : item.Type; // 👈 Fallback de sécurité
+                item.UpdatedAt = DateTime.UtcNow;
 
-            db.CanvasItems.Add(item);
-            await db.SaveChangesAsync();
+                db.CanvasItems.Add(item);
+                await db.SaveChangesAsync();
 
-            return Results.Created($"/api/canvas/items/{item.Id}", item);
-        });
+                return Results.Created($"/api/canvas/items/{item.Id}", item);
+            });
 
         // 6. Mettre à jour la position ou le contenu d'un élément
         group.MapPut("/items/{id:guid}", async (Guid id, CanvasItem updatedItem, ClaimsPrincipal user, LexapadDbContext db) =>
