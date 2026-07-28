@@ -96,20 +96,26 @@ public static class CanvasEndpoints
 
         // 6. Mettre à jour la position ou le contenu d'un élément
         group.MapPut("/items/{id:guid}", async (Guid id, CanvasItem updatedItem, ClaimsPrincipal user, LexapadDbContext db) =>
-        {
+            {
             var userId = GetUserId(user);
             var existingItem = await db.CanvasItems
                 .FirstOrDefaultAsync(i => i.Id == id && i.UserId == userId);
 
             if (existingItem is null) return Results.NotFound();
 
-            existingItem.Type = updatedItem.Type;
-            existingItem.Content = updatedItem.Content;
+            // Protection contre les valeurs nulles envoyées par le front
+            if (!string.IsNullOrEmpty(updatedItem.Type)) 
+                existingItem.Type = updatedItem.Type;
+
+            existingItem.Content = updatedItem.Content ?? string.Empty;
             existingItem.PositionX = updatedItem.PositionX;
             existingItem.PositionY = updatedItem.PositionY;
-            existingItem.Width = updatedItem.Width;
-            existingItem.Height = updatedItem.Height;
-            existingItem.Color = updatedItem.Color;
+            existingItem.Width = updatedItem.Width > 0 ? updatedItem.Width : existingItem.Width;
+            existingItem.Height = updatedItem.Height > 0 ? updatedItem.Height : existingItem.Height;
+            
+            if (!string.IsNullOrEmpty(updatedItem.Color))
+                existingItem.Color = updatedItem.Color;
+
             existingItem.ZIndex = updatedItem.ZIndex;
             existingItem.UpdatedAt = DateTime.UtcNow;
 
